@@ -13,27 +13,64 @@ const (
 	ScreenHeight = 32
 )
 
+// Those are the hex values for the pixels of the Digits aka the Fonts
+var fontSet = [80]uint8{
+	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+	0x20, 0x60, 0x20, 0x20, 0x70, // 1
+	0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+	0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+	0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+	0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+	0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+	0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+	0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+	0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+	0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+	0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+	0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
+}
+
 type Chip8 struct {
 	Opcode uint16
+
 	// --- REGISTERS ---
 	V  [16]uint8 // 16 8-bit all purpose registers V0-VF
 	I  uint16    // Index Register
 	PC uint16    // Programm Counter
+
 	// --- STACK ---
 	Stack [16]uint16
 	SP    uint16 // Stack Pointer
+
 	// --- MEMORY ---
 	Ram [4096]uint8
+
 	// --- DISPLAY ---
 	// The Pixels are stored bytewise for easier handling, you could pack it
 	// since one pixels only stores 1 or 0
 	GFX [ScreenWidth * ScreenHeight]uint8 // 1 = white, 0 = black
+
+	// --- TIMER ---
+	DelayTimer uint8
+	SoundTimer uint8
 }
 
 func (c *Chip8) Init() {
-	c.Ram = [4096]uint8{}
+	c.Ram = [4096]uint8{0}
+	c.Stack = [16]uint16{0}
+	c.V = [16]uint8{0}
 	c.PC = 512
 	c.GFX = [ScreenWidth * ScreenHeight]uint8{0}
+	c.SP = 0
+	c.I = 512
+
+	// Load fonts into Ram
+	for i, v := range fontSet {
+		c.Ram[i] = v
+	}
 }
 
 // Loads a programm into ram. If the programm is too long, there will be an error.
@@ -75,6 +112,14 @@ func (c *Chip8) Cycle() {
 
 	// --- DECODE & EXECUTE ---
 	c.Execute(opcode)
+
+	// Reduce timers
+	if c.DelayTimer > 0 {
+		c.DelayTimer--
+	}
+	if c.SoundTimer > 0 {
+		c.SoundTimer--
+	}
 }
 
 func (c *Chip8) Execute(opcode uint16) {
@@ -86,30 +131,82 @@ func (c *Chip8) Execute(opcode uint16) {
 		if opcode == ClearScreen {
 			c.OpClearScreen()
 		} else if opcode == ReturnFromSubroutine {
-			fmt.Println("RET - Return from Subroutine")
-			// TODO: reduce SP, set PC
+			c.OpReturnFromSubroutine()
 		}
 
 	// Jumps to NNN
-	case 0x1000:
+	case Jump:
 		c.OpJump(opcode)
 
+	// Calls Subroutine at address NNN
+	case CallSubroutine:
+		c.OpCallSubroutine(opcode)
+
+	// Skips next instruction if VX == NN
+	case SkipIfEquals:
+		c.OpSkipIfEqulas(opcode)
+
+	// Skips the next instruction if VX != NN
+	case SkipIfNotEquals:
+		c.OpSkipIfNotEqual(opcode)
+
 	// Sets VX = NN
-	case 0x6000:
+	case SetVX:
 		c.OpSetRegister(opcode)
 
 	// VX += NN
-	case 0x7000:
+	case AddVX:
 		c.OpAddToRegister(opcode)
 
 	// Sets I = NNN (Index Register)
 	case 0xA000:
 		c.OpSetIndexRegister(opcode)
 
+	// Math and Bitwise operators
+	case 0x8000:
+		switch opcode & 0xF00F {
+		case BitwiseOR:
+			c.OpBitwiseOR(opcode)
+		case BitwiseAND:
+			c.OpBitwiseAND(opcode)
+		case BitwiseXOR:
+			c.OpBitwiseXOR(opcode)
+		case Add:
+			c.OpAdd(opcode)
+		case Sub:
+			c.OpSub(opcode)
+		case RightShift:
+			c.OpRightShift(opcode)
+		case SubReverse:
+			c.OpSubReverse(opcode)
+		case LeftShift:
+			c.OpLeftShift(opcode)
+		}
+
 	// DXYN
 	// Draws a sprite at VX, VY with width = 8px and height = Npx
-	case 0xD000:
+	case DrawSprite:
 		c.OpDraw(opcode)
+
+	case 0xE000:
+		switch opcode & 0xF0FF {
+		case SkipIfKeyNotPressed:
+			c.OpSkipIfKeyNotPressed(opcode)
+		case SkipIfKeyIsPressed:
+			c.OpSkipIfKeyIsPressed(opcode)
+		}
+
+	// Sets VX = DelayTimer
+	case 0xF000:
+		switch opcode & 0x00FF {
+		case GetDelayTimer:
+			c.OpGetDelayTimer(opcode)
+		case SetDelayTimer:
+			c.OpSetDelayTimer(opcode)
+		case SetIndexToSprite:
+			c.OpSetIndexToSprite(opcode)
+		}
+
 	default:
 		fmt.Println("Unknown Opcode:", ToHex(opcode))
 	}
