@@ -1,3 +1,0 @@
-package opcodes
-
-const ()
