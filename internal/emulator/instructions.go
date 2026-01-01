@@ -16,7 +16,10 @@ func (c *Chip8) OpClearScreen() {
 func (c *Chip8) OpJump(opcode uint16) {
 	nnn := opcode & 0x0FFF
 	c.PC = nnn
-	fmt.Printf("JMP %s\n", ToHex(nnn))
+
+	if nnn != 0x0228 {
+		fmt.Printf("JMP %s\n", ToHex(nnn))
+	}
 }
 
 func (c *Chip8) OpSetIndexRegister(opcode uint16) {
