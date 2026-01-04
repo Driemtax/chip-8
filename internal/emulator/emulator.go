@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"chip-8/pkg"
 	"errors"
 	"fmt"
 	"log"
@@ -56,6 +57,12 @@ type Chip8 struct {
 	// --- TIMER ---
 	DelayTimer uint8
 	SoundTimer uint8
+
+	// --- INPUT ---
+	Key [16]uint8 // current state of the hex-keypad
+
+	// --- LOGGING ---
+	Logger pkg.Logger
 }
 
 func (c *Chip8) Init() {
@@ -71,6 +78,9 @@ func (c *Chip8) Init() {
 	for i, v := range fontSet {
 		c.Ram[i] = v
 	}
+
+	// New empty Logger instance for logging the instructions (debugging)
+	c.Logger = pkg.Logger{}
 }
 
 // Loads a programm into ram. If the programm is too long, there will be an error.
@@ -113,13 +123,6 @@ func (c *Chip8) Cycle() {
 	// --- DECODE & EXECUTE ---
 	c.Execute(opcode)
 
-	// Reduce timers
-	if c.DelayTimer > 0 {
-		c.DelayTimer--
-	}
-	if c.SoundTimer > 0 {
-		c.SoundTimer--
-	}
 }
 
 func (c *Chip8) Execute(opcode uint16) {
@@ -165,6 +168,8 @@ func (c *Chip8) Execute(opcode uint16) {
 	// Math and Bitwise operators
 	case 0x8000:
 		switch opcode & 0xF00F {
+		case SetVXtoVY:
+			c.OpSetVXtoVY(opcode)
 		case BitwiseOR:
 			c.OpBitwiseOR(opcode)
 		case BitwiseAND:
@@ -183,6 +188,8 @@ func (c *Chip8) Execute(opcode uint16) {
 			c.OpLeftShift(opcode)
 		}
 
+	case Random:
+		c.OpRandom(opcode)
 	// DXYN
 	// Draws a sprite at VX, VY with width = 8px and height = Npx
 	case DrawSprite:
@@ -205,6 +212,12 @@ func (c *Chip8) Execute(opcode uint16) {
 			c.OpSetDelayTimer(opcode)
 		case SetIndexToSprite:
 			c.OpSetIndexToSprite(opcode)
+		case BinaryCodedDecimal:
+			c.OpBCD(opcode)
+		case StoreRegisters:
+			c.OpStoreRegisters(opcode)
+		case LoadRegisters:
+			c.OpLoadRegisters(opcode)
 		}
 
 	default:
@@ -223,4 +236,9 @@ func ToHex(op uint16) string {
 	n1 := op & 0x000F
 
 	return fmt.Sprintf("%x%x%x%x", n1, n2, n3, n4)
+}
+
+func (c *Chip8) Log(message string) {
+	fmt.Println(message)
+	c.Logger = append(c.Logger, message)
 }

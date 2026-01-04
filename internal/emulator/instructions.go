@@ -1,6 +1,9 @@
 package emulator
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+)
 
 const (
 	ClearScreen          uint16 = 0x00E0
@@ -12,6 +15,7 @@ const (
 	SkipIfVXEQVY         uint16 = 0x5000
 	SetVX                uint16 = 0x6000
 	AddVX                uint16 = 0x7000
+	SetVXtoVY            uint16 = 0x8000
 	BitwiseOR            uint16 = 0x8001
 	BitwiseAND           uint16 = 0x8002
 	BitwiseXOR           uint16 = 0x8003
@@ -20,17 +24,22 @@ const (
 	RightShift           uint16 = 0x8006
 	SubReverse           uint16 = 0x8007
 	LeftShift            uint16 = 0x800E
+	Random               uint16 = 0xC000
 	DrawSprite           uint16 = 0xD000
 	SkipIfKeyNotPressed  uint16 = 0xE0A1
 	SkipIfKeyIsPressed   uint16 = 0xE09E
 	GetDelayTimer        uint16 = 0x07
 	SetDelayTimer        uint16 = 0x15
 	SetIndexToSprite     uint16 = 0x29
+	BinaryCodedDecimal   uint16 = 0x33
+	StoreRegisters       uint16 = 0x55
+	LoadRegisters        uint16 = 0x65
 )
 
 func (c *Chip8) OpClearScreen() {
 	c.GFX = [ScreenWidth * ScreenHeight]uint8{0}
-	fmt.Println("CLS - Clear Screen")
+	message := fmt.Sprintln("CLS - Clear Screen")
+	c.Log(message)
 }
 
 // OOEE --- RET Returns from the current subroutine
@@ -39,7 +48,9 @@ func (c *Chip8) OpReturnFromSubroutine() {
 	c.SP--
 	// 2. Reset the Programm Counter to that address
 	c.PC = c.Stack[c.SP]
-	fmt.Println("RET to", ToHex(c.PC))
+
+	message := fmt.Sprintln("RET to", ToHex(c.PC))
+	c.Log(message)
 }
 
 func (c *Chip8) OpJump(opcode uint16) {
@@ -47,7 +58,8 @@ func (c *Chip8) OpJump(opcode uint16) {
 	c.PC = nnn
 
 	if nnn != 0x0228 {
-		fmt.Printf("JMP %s\n", ToHex(nnn))
+		message := fmt.Sprintf("JMP %s\n", ToHex(nnn))
+		c.Log(message)
 	}
 }
 
@@ -60,7 +72,9 @@ func (c *Chip8) OpCallSubroutine(opcode uint16) {
 	c.SP++
 	// 3. Set Programm Counter to Address NNN, this is the actual CALL
 	c.PC = nnn
-	fmt.Println("CALL", ToHex(nnn))
+
+	message := fmt.Sprintln("CALL", ToHex(nnn))
+	c.Log(message)
 }
 
 // 3XNN --- Skips the next instruction if VX == NN
@@ -71,9 +85,11 @@ func (c *Chip8) OpSkipIfEqulas(opcode uint16) {
 	if c.V[x] == nn {
 		// Remember that one instruction is 2 Bytes long!
 		c.PC += 2
-		fmt.Printf("IFEQ %X, %X\n", c.V[x], nn)
+		message := fmt.Sprintf("IFEQ %X, %X\n", c.V[x], nn)
+		c.Log(message)
 	} else {
-		fmt.Printf("PASS since %X != %X\n", c.V[x], nn)
+		message := fmt.Sprintf("PASS since %X != %X\n", c.V[x], nn)
+		c.Log(message)
 	}
 }
 
@@ -85,16 +101,19 @@ func (c *Chip8) OpSkipIfNotEqual(opcode uint16) {
 	if c.V[x] != nn {
 		// Remember that one instruction is 2 Bytes long!
 		c.PC += 2
-		fmt.Printf("IFNEQ %X, %X\n", c.V[x], nn)
+		message := fmt.Sprintf("IFNEQ %X, %X\n", c.V[x], nn)
+		c.Log(message)
 	} else {
-		fmt.Printf("PASS since %X == %X\n", c.V[x], nn)
+		message := fmt.Sprintf("PASS since %X == %X\n", c.V[x], nn)
+		c.Log(message)
 	}
 }
 
 // 5XY0 --- Skips the next instruction if VX == VY
 func (c *Chip8) OpSkipVXEQVY(opcode uint16) {
 	if opcode&0x000F != 0 {
-		fmt.Println("Invalid opcode:", ToHex(opcode))
+		message := fmt.Sprintln("Invalid opcode:", ToHex(opcode))
+		c.Log(message)
 		return
 	}
 
@@ -104,16 +123,19 @@ func (c *Chip8) OpSkipVXEQVY(opcode uint16) {
 	if c.V[x] == c.V[y] {
 		// Remember that one instruction is 2 Bytes long!
 		c.PC += 2
-		fmt.Printf("IFXEQY %X, %Y\n", c.V[x], c.V[y])
+		message := fmt.Sprintf("IFXEQY %X, %Y\n", c.V[x], c.V[y])
+		c.Log(message)
 	} else {
-		fmt.Printf("PASS since %X != %X\n", c.V[x], c.V[y])
+		message := fmt.Sprintf("PASS since %X != %X\n", c.V[x], c.V[y])
+		c.Log(message)
 	}
 }
 
 func (c *Chip8) OpSetIndexRegister(opcode uint16) {
 	nnn := extractNNN(opcode)
 	c.I = nnn
-	fmt.Printf("MOV I, %s\n", ToHex(nnn))
+	message := fmt.Sprintf("MOV I, %s\n", ToHex(nnn))
+	c.Log(message)
 }
 
 // 6XNN --- Sets register VX = NN
@@ -121,14 +143,27 @@ func (c *Chip8) OpSetRegister(opcode uint16) {
 	x := extractX(opcode)
 	nn := extractNN(opcode)
 	c.V[x] = nn
-	fmt.Printf("LD V%X, %X\n", x, nn)
+	message := fmt.Sprintf("LD V%X, %X\n", x, nn)
+	c.Log(message)
 }
 
 func (c *Chip8) OpAddToRegister(opcode uint16) {
 	x := extractX(opcode)
 	nn := extractNN(opcode)
 	c.V[x] += nn
-	fmt.Printf("ADD V%X, %X\n", x, nn)
+	message := fmt.Sprintf("ADD V%X, %X\n", x, nn)
+	c.Log(message)
+}
+
+// 8XY0 --- Sets VX to the value of VY
+func (c *Chip8) OpSetVXtoVY(opcode uint16) {
+	x := extractX(opcode)
+	y := extractY(opcode)
+	VY := c.V[y]
+	c.V[x] = VY
+
+	message := fmt.Sprintf("LD V%X, V%X (%X)\n", x, y, VY)
+	c.Log(message)
 }
 
 // 8XY1 --- Bitwise OR of VX | VY. The result is stored in VX
@@ -139,7 +174,8 @@ func (c *Chip8) OpBitwiseOR(opcode uint16) {
 	VY := c.V[y]
 	c.V[x] = VX | VY
 
-	fmt.Printf("OR %X, %X\n", VX, VY)
+	message := fmt.Sprintf("OR %X, %X\n", VX, VY)
+	c.Log(message)
 }
 
 // 8XY2 --- Bitwise AND of VX & VY. The result is stored in VX
@@ -150,7 +186,8 @@ func (c *Chip8) OpBitwiseAND(opcode uint16) {
 	VY := c.V[y]
 	c.V[x] = VX & VY
 
-	fmt.Printf("AND %X, %X\n", VX, VY)
+	message := fmt.Sprintf("AND %X, %X\n", VX, VY)
+	c.Log(message)
 }
 
 // 8XY3 --- Bitwise XOR of VX ^ VY. The result is stored in VX
@@ -161,7 +198,8 @@ func (c *Chip8) OpBitwiseXOR(opcode uint16) {
 	VY := c.V[y]
 	c.V[x] = VX ^ VY
 
-	fmt.Printf("XOR %X, %X\n", VX, VY)
+	message := fmt.Sprintf("XOR %X, %X\n", VX, VY)
+	c.Log(message)
 }
 
 // 8XY4 --- Adds VY to VX. VF is set to 1 when there's an overflow, and to 0 when there is not
@@ -173,14 +211,15 @@ func (c *Chip8) OpAdd(opcode uint16) {
 
 	result := uint16(VX) + uint16(VY)
 	// if there is an overflow, VF is set to 1, otherwise to 0
+	var borrow uint8 = 0
 	if result > 255 {
-		c.V[15] = 1
-	} else {
-		c.V[15] = 0
+		borrow = 1
 	}
-	c.V[x] = VX + VY
+	c.V[x] = uint8(result)
+	c.V[0xF] = borrow
 
-	fmt.Printf("ADD %X, %X\n", VX, VY)
+	message := fmt.Sprintf("ADD %X, %X\n", VX, VY)
+	c.Log(message)
 }
 
 // 8XY5 --- VY is subtracted from VX. VF is set to 0 when there's an underflow, and 1 when there is not. (i.e. VF set to 1 if VX >= VY and 0 if not).
@@ -190,15 +229,18 @@ func (c *Chip8) OpSub(opcode uint16) {
 	VX := c.V[x]
 	VY := c.V[y]
 
-	// if there is an underflow, VF is set to 0, otherwise to 1
-	if VY > VX {
-		c.V[15] = 0
-	} else {
-		c.V[15] = 1
-	}
-	c.V[x] = VX - VY
+	result := VX - VY
 
-	fmt.Printf("SUB %X, %X\n", VX, VY)
+	// if there is an underflow, VF is set to 0, otherwise to 1
+	var notBorrow uint8 = 1
+	if VY >= VX {
+		notBorrow = 0
+	}
+	c.V[x] = result
+	c.V[0xF] = notBorrow
+
+	message := fmt.Sprintf("SUB %X, %X\n", VX, VY)
+	c.Log(message)
 }
 
 // 8XY6 --- Shifts VX to the right by 1, then stores the least significant bit of VX prior to the shift into VF.
@@ -209,7 +251,8 @@ func (c *Chip8) OpRightShift(opcode uint16) {
 	c.V[15] = lsb
 	c.V[x] = VX >> 1
 
-	fmt.Printf("SHR V%X (%X)\n", x, VX)
+	message := fmt.Sprintf("SHR V%X (%X)\n", x, VX)
+	c.Log(message)
 }
 
 // 8XY7 --- Sets VX to VY minus VX.
@@ -220,16 +263,19 @@ func (c *Chip8) OpSubReverse(opcode uint16) {
 	VX := c.V[x]
 	VY := c.V[y]
 
+	result := VY - VX
+
+	var notBorrow uint8 = 1
 	// check for underflow
-	if VX > VY {
-		c.V[15] = 0
-	} else {
-		c.V[15] = 1
+	if VX >= VY {
+		notBorrow = 0
 	}
 
-	c.V[x] = VY - VX
+	c.V[x] = result
+	c.V[0xF] = notBorrow
 
-	fmt.Printf("SUBN %X, %X\n", VY, VX)
+	message := fmt.Sprintf("SUBN %X, %X\n", VY, VX)
+	c.Log(message)
 }
 
 // 8XYE --- Shifts VX to the left by 1, then sets VF to 1 if the most significant bit of VX prior to that shift was set, or to 0 if it was unset.
@@ -240,7 +286,21 @@ func (c *Chip8) OpLeftShift(opcode uint16) {
 	c.V[15] = msb
 	c.V[x] = VX << 1
 
-	fmt.Printf("SHL V%X (%X)\n", x, VX)
+	message := fmt.Sprintf("SHL V%X (%X)\n", x, VX)
+	c.Log(message)
+}
+
+// CXNN --- Set VX = random byte AND NN
+func (c *Chip8) OpRandom(opcode uint16) {
+	x := extractX(opcode)
+	nn := extractNN(opcode)
+
+	randomByte := uint8(rand.Intn(256))
+
+	c.V[x] = randomByte & nn
+
+	message := fmt.Sprintf("RND V%X, %X (Result: %X)\n", x, nn, c.V[x])
+	c.Log(message)
 }
 
 // DXYN --- Draw Sprite from VX to VY with Width = 8 and Height = N
@@ -266,8 +326,13 @@ func (c *Chip8) OpDraw(opcode uint16) {
 			if (spriteByte & (0x80 >> col)) != 0 {
 				// calculate position on screen
 				// using modulo for wrapping the lines
-				screenX := (uint16(vx) + col) % ScreenWidth
-				screenY := (uint16(vy) + row) % ScreenHeight
+				screenX := (uint16(vx) + col) //% ScreenWidth
+				screenY := (uint16(vy) + row) //% ScreenHeight
+
+				// Clipping
+				if screenX >= ScreenWidth || screenY >= ScreenHeight {
+					continue
+				}
 
 				// calculate index in GFX (1D-Araay)
 				// i = y*w+x
@@ -284,33 +349,58 @@ func (c *Chip8) OpDraw(opcode uint16) {
 		}
 	}
 
-	fmt.Printf("DRAW V%X(%d), V%X(%d), H:%d\n", x, vx, y, vy, height)
+	message := fmt.Sprintf("DRAW V%X(%d), V%X(%d), H:%d\n", x, vx, y, vy, height)
+	c.Log(message)
 }
 
 // EX9E --- Skips the next instruction if the key stored in VX(only consider the lowest nibble)
 // is pressed (usually the next instruction is a jump to skip a code block).
 func (c *Chip8) OpSkipIfKeyIsPressed(opcode uint16) {
+	x := extractX(opcode)
+	keyIndex := c.V[x] & 0x0F
 
+	if c.Key[keyIndex] == 1 {
+		c.PC += 2
+		message := fmt.Sprintf("SKIP KEY PRESS V%X (%X)\n", x, keyIndex)
+		c.Log(message)
+	} else {
+		message := fmt.Sprintf("NO SKIP KEY PRESS V%X (%X)\n", x, keyIndex)
+		c.Log(message)
+	}
 }
 
 // EXA1 --- Skips the next instruction if the key stored in VX(only consider the lowest nibble)
 // is not pressed (usually the next instruction is a jump to skip a code block).
 func (c *Chip8) OpSkipIfKeyNotPressed(opcode uint16) {
+	x := extractX(opcode)
+	keyIndex := c.V[x] & 0x0F
 
+	if c.Key[keyIndex] == 0 {
+		c.PC += 2
+		message := fmt.Sprintf("SKIP KEY NOT PRESSED V%X (%X)\n", x, keyIndex)
+		c.Log(message)
+	} else {
+		message := fmt.Sprintf("NO SKIP KEY NOT PRESSED V%X (%X)\n", x, keyIndex)
+		c.Log(message)
+	}
 }
 
 // FX07 --- Gets the Delay Timer and stores the result in VX
 func (c *Chip8) OpGetDelayTimer(opcode uint16) {
 	x := extractX(opcode)
 	c.V[x] = c.DelayTimer
-	fmt.Printf("LD V%X, %X\n", x, c.DelayTimer)
+
+	message := fmt.Sprintf("LD V%X, %X\n", x, c.DelayTimer)
+	c.Log(message)
 }
 
 // FX15 --- Sets the Delay Timer to the Value in VX
 func (c *Chip8) OpSetDelayTimer(opcode uint16) {
 	x := extractX(opcode)
 	c.DelayTimer = c.V[x]
-	fmt.Printf("LD DT, V%X (%X)\n", x, c.DelayTimer)
+
+	message := fmt.Sprintf("LD DT, V%X (%X)\n", x, c.DelayTimer)
+	c.Log(message)
 }
 
 // FX29 --- Sets the Index Register I to the location of the sprite for the character in VX
@@ -318,7 +408,47 @@ func (c *Chip8) OpSetDelayTimer(opcode uint16) {
 func (c *Chip8) OpSetIndexToSprite(opcode uint16) {
 	x := extractX(opcode)
 	c.I = uint16(c.V[x]) * 5 // One Character in the font is 5 Bytes long, so we need ot offset
-	fmt.Printf("LD I, V%X (Sprite für %X)\n", x, c.I)
+
+	message := fmt.Sprintf("LD I, V%X (Sprite für %X)\n", x, c.I)
+	c.Log(message)
+}
+
+// FX33 --- Store BCD representation of VX in memory locations I, I+1, and I+2
+func (c *Chip8) OpBCD(opcode uint16) {
+	x := extractX(opcode)
+	value := c.V[x]
+
+	// 100 position
+	c.Ram[c.I] = value / 100
+	// 10 position
+	c.Ram[c.I+1] = (value / 10) % 10
+	// 1 position
+	c.Ram[c.I+2] = value % 10
+
+	message := fmt.Sprintf("BCD V%X (%d) -> Ram[%X...%X]\n", x, value, c.I, c.I+2)
+	c.Log(message)
+}
+
+// FX55 --- Store registers V0 through VX in memory starting at location I
+func (c *Chip8) OpStoreRegisters(opcode uint16) {
+	x := extractX(opcode)
+	for i := uint16(0); i <= x; i++ {
+		c.Ram[c.I+i] = c.V[i]
+	}
+
+	message := fmt.Sprintf("DUMP V0...V%X to Ram[%X]\n", x, c.I)
+	c.Log(message)
+}
+
+// FX65 --- Read Registers V0 through VX from memory starting at location I
+func (c *Chip8) OpLoadRegisters(opcode uint16) {
+	x := extractX(opcode)
+	for i := uint16(0); i <= x; i++ {
+		c.V[i] = c.Ram[c.I+i]
+	}
+
+	message := fmt.Sprintf("LOAD V0...V%X from Ram[%X]\n", x, c.I)
+	c.Log(message)
 }
 
 func extractX(opcode uint16) uint16 {
