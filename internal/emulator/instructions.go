@@ -3,39 +3,47 @@ package emulator
 import (
 	"fmt"
 	"math/rand"
+	"slices"
 )
 
 const (
-	ClearScreen          uint16 = 0x00E0
-	ReturnFromSubroutine uint16 = 0x00EE
-	Jump                 uint16 = 0x1000
-	CallSubroutine       uint16 = 0x2000
-	SkipIfEquals         uint16 = 0x3000
-	SkipIfNotEquals      uint16 = 0x4000
-	SkipIfVXEQVY         uint16 = 0x5000
-	SetVX                uint16 = 0x6000
-	AddVX                uint16 = 0x7000
-	SetVXtoVY            uint16 = 0x8000
-	BitwiseOR            uint16 = 0x8001
-	BitwiseAND           uint16 = 0x8002
-	BitwiseXOR           uint16 = 0x8003
-	Add                  uint16 = 0x8004
-	Sub                  uint16 = 0x8005
-	RightShift           uint16 = 0x8006
-	SubReverse           uint16 = 0x8007
-	LeftShift            uint16 = 0x800E
-	Random               uint16 = 0xC000
-	DrawSprite           uint16 = 0xD000
-	SkipIfKeyNotPressed  uint16 = 0xE0A1
-	SkipIfKeyIsPressed   uint16 = 0xE09E
-	GetDelayTimer        uint16 = 0x07
-	SetDelayTimer        uint16 = 0x15
-	SetIndexToSprite     uint16 = 0x29
-	BinaryCodedDecimal   uint16 = 0x33
-	StoreRegisters       uint16 = 0x55
-	LoadRegisters        uint16 = 0x65
+	ClearScreen           uint16 = 0x00E0
+	ReturnFromSubroutine  uint16 = 0x00EE
+	Jump                  uint16 = 0x1000
+	CallSubroutine        uint16 = 0x2000
+	SkipIfEquals          uint16 = 0x3000
+	SkipIfNotEquals       uint16 = 0x4000
+	SkipIfVXEQVY          uint16 = 0x5000
+	SetVX                 uint16 = 0x6000
+	AddVX                 uint16 = 0x7000
+	SetVXtoVY             uint16 = 0x8000
+	BitwiseOR             uint16 = 0x8001
+	BitwiseAND            uint16 = 0x8002
+	BitwiseXOR            uint16 = 0x8003
+	Add                   uint16 = 0x8004
+	Sub                   uint16 = 0x8005
+	RightShift            uint16 = 0x8006
+	SubReverse            uint16 = 0x8007
+	LeftShift             uint16 = 0x800E
+	SkipRegistersNotEqual uint16 = 0x9000
+	SetIndex              uint16 = 0xA000
+	JumpPlusV0            uint16 = 0xB000
+	Random                uint16 = 0xC000
+	DrawSprite            uint16 = 0xD000
+	SkipIfKeyNotPressed   uint16 = 0xE0A1
+	SkipIfKeyIsPressed    uint16 = 0xE09E
+	GetDelayTimer         uint16 = 0x07
+	WaitKeypress          uint16 = 0x0A
+	SetDelayTimer         uint16 = 0x15
+	SetSoundToVx          uint16 = 0x18
+	AddVXToIndex          uint16 = 0x1E
+	SetIndexToSprite      uint16 = 0x29
+	BinaryCodedDecimal    uint16 = 0x33
+	StoreRegisters        uint16 = 0x55
+	LoadRegisters         uint16 = 0x65
 )
 
+// 00E0 --- Clears the screen
 func (c *Chip8) OpClearScreen() {
 	c.GFX = [ScreenWidth * ScreenHeight]uint8{0}
 	message := fmt.Sprintln("CLS - Clear Screen")
@@ -53,6 +61,7 @@ func (c *Chip8) OpReturnFromSubroutine() {
 	c.Log(message)
 }
 
+// 1NNN --- Jumps to address NNN.
 func (c *Chip8) OpJump(opcode uint16) {
 	nnn := extractNNN(opcode)
 	c.PC = nnn
@@ -131,13 +140,6 @@ func (c *Chip8) OpSkipVXEQVY(opcode uint16) {
 	}
 }
 
-func (c *Chip8) OpSetIndexRegister(opcode uint16) {
-	nnn := extractNNN(opcode)
-	c.I = nnn
-	message := fmt.Sprintf("MOV I, %s\n", ToHex(nnn))
-	c.Log(message)
-}
-
 // 6XNN --- Sets register VX = NN
 func (c *Chip8) OpSetRegister(opcode uint16) {
 	x := extractX(opcode)
@@ -147,6 +149,7 @@ func (c *Chip8) OpSetRegister(opcode uint16) {
 	c.Log(message)
 }
 
+// 7XNN --- Adds NN to VX (carry flag is not changed).
 func (c *Chip8) OpAddToRegister(opcode uint16) {
 	x := extractX(opcode)
 	nn := extractNN(opcode)
@@ -290,6 +293,37 @@ func (c *Chip8) OpLeftShift(opcode uint16) {
 	c.Log(message)
 }
 
+// 9XY0 --- Skips the next instruction if VX does not equal VY. (Usually the next instruction is a jump to skip a code block).
+func (c *Chip8) OpSkipRegistersNotEqual(opcode uint16) {
+	x := extractX(opcode)
+	y := extractY(opcode)
+	VX := c.V[x]
+	VY := c.V[y]
+
+	if VX != VY {
+		c.PC += 2
+		message := fmt.Sprintf("SNE V%X, V%Y\n", x, y)
+		c.Log(message)
+	}
+}
+
+// ANNN --- Sets I to the address NNN.
+func (c *Chip8) OpSetIndexRegister(opcode uint16) {
+	nnn := extractNNN(opcode)
+	c.I = nnn
+	message := fmt.Sprintf("MOV I, %s\n", ToHex(nnn))
+	c.Log(message)
+}
+
+// BNNN --- Jumps to the address NNN plus V0.
+func (c *Chip8) OpJumpPlusV0(opcode uint16) {
+	nnn := extractNNN(opcode)
+	c.PC = nnn + uint16(c.V[0])
+
+	message := fmt.Sprintf("JMP V0 (%X), %s\n", c.V[0], ToHex(nnn))
+	c.Log(message)
+}
+
 // CXNN --- Set VX = random byte AND NN
 func (c *Chip8) OpRandom(opcode uint16) {
 	x := extractX(opcode)
@@ -394,12 +428,64 @@ func (c *Chip8) OpGetDelayTimer(opcode uint16) {
 	c.Log(message)
 }
 
+// FX0A --- A key press is awaited, and then stored in VX
+// (blocking operation, all instruction halted until next key event, delay and sound timers should continue processing)
+func (c *Chip8) OpWaitKeyPress(opcode uint16) {
+	// If a key is pressed, just continue normally
+	key := c.isKeyPressed()
+
+	// Case no key is pressed currently
+	if key == -1 {
+		// Was there a key pressed before?
+		if c.KeyPressedBuffer != 255 {
+			x := extractX(opcode)
+			c.V[x] = c.KeyPressedBuffer
+
+			message := fmt.Sprintf("KEY RELEASED V%X, %X\n", x, c.KeyPressedBuffer)
+			c.Log(message)
+
+			c.KeyPressedBuffer = 255 // Reset Buffer, IMPORTANT!!
+			return                   // Get on with the next instruction
+		}
+
+		// No key was remembered in the buffer, means we still wait for the first keypress
+		c.PC -= 2 // This line will effect, that the instruction we fetch is this one again until one key was pressed.
+		// message := fmt.Sprintf("WAIT KEY...\n")
+		// c.Log(message)
+		return
+	}
+
+	// Case there is a key pressed currently
+	c.KeyPressedBuffer = uint8(key)
+	// Reset PC because we wait until the key is released
+	c.PC -= 2
+
+}
+
 // FX15 --- Sets the Delay Timer to the Value in VX
 func (c *Chip8) OpSetDelayTimer(opcode uint16) {
 	x := extractX(opcode)
 	c.DelayTimer = c.V[x]
 
 	message := fmt.Sprintf("LD DT, V%X (%X)\n", x, c.DelayTimer)
+	c.Log(message)
+}
+
+// FX18 --- Sets the sound timer to VX.
+func (c *Chip8) OpSetSoundToVX(opcode uint16) {
+	x := extractX(opcode)
+	c.SoundTimer = c.V[x]
+
+	message := fmt.Sprintf("LD SD, V%X (%X)\n", x, c.V[x])
+	c.Log(message)
+}
+
+// FX1E --- Adds VX to I. VF is not affected.
+func (c *Chip8) OpAddVXToIndex(opcode uint16) {
+	x := extractX(opcode)
+	c.I += uint16(c.V[x])
+
+	message := fmt.Sprintf("ADD I, V%X (%X)\n", x, c.V[x])
 	c.Log(message)
 }
 
@@ -471,4 +557,11 @@ func extractNN(opcode uint16) uint8 {
 
 func extractNNN(opcode uint16) uint16 {
 	return opcode & 0x0FFF
+}
+
+// Checks wether any key is pressed or not. Returns the key if pressend, -1 if no key was pressed
+func (c *Chip8) isKeyPressed() int {
+	index := slices.Index(c.Key[:], uint8(1))
+
+	return index
 }
