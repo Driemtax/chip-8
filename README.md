@@ -74,7 +74,7 @@ I $=$ 16-bit Index register
 | 8XY6 | SHR Vx | Set Vx $=$ Vx >> 1 |
 | 8XY7 | SUBN Vx, Vy | Set Vx $=$ Vy - Vx, set VF NOT borrow. |
 | 8XYE | SHL Vx | Set Vx $=$ Vx << 1 |
-| 9XY0 | SNE Vx, Vy | TODO - Yet to implement |
+| 9XY0 | SNE Vx, Vy | Skips the next instruction if VX does not equal VY.  |
 | ANNN | LD I, addr | Set I $=$ NNN |
 | BNNN | JP V0, addr | Jump to location NNN $+$ V0 |
 | CXNN | RND Vx, byte | Set Vx $=$ random byte AND NN |
@@ -82,10 +82,10 @@ I $=$ 16-bit Index register
 | EX9E | SKP Vx | Skip next instruction if key with the value of Vx is pressed. |
 | EXA1 | SKNP Vx | Skip next instruction if key with the value of Vx is NOT pressed. |
 | FX07 | LD Vx, DT | Set Vx $=$ delay timer value. |
-| FX0A | LD Vx, K | TODO - Yet to implement |
+| FX0A | LD Vx, K | A key press is awaited, and then stored in VX (blocking operation, all instruction halted until next key event, delay and sound timers should continue processing) |
 | FX15 | LD DT, Vx | Set delay timer $=$ Vx |
-| FX18 | ST, Vx | TODO - Yet to implement |
-| FX1E | ADD I, Vx | TODO - Yet to implement |
+| FX18 | ST, Vx | Sets the sound timer to VX. |
+| FX1E | ADD I, Vx | Adds VX to I. VF is not affected. |
 | FX29 | LD F, Vx | Set I $=$ location of sprite for digit in Vx |
 | FX33 | LD B, Vx | Store BinaryCodedDecimal representation of Vx in memory locations I, I+1, I+2 |
 | FX55 | LD[I], Vx | Store registers V0 through Vx in memory starting at location I |

@@ -65,7 +65,7 @@ func main() {
 	fmt.Println("Starting up the CHIP-8...")
 	emu := &emulator.Chip8{}
 	emu.Init()
-	path := "Pong.ch8"
+	path := "Chip8 Picture.ch8"
 	err := emu.LoadROM(path)
 	if err != nil {
 		log.Fatal("Error loading ROM:", err)

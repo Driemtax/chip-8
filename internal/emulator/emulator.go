@@ -60,6 +60,9 @@ type Chip8 struct {
 
 	// --- INPUT ---
 	Key [16]uint8 // current state of the hex-keypad
+	// Helper for FX0A to wait for key release
+	// 255 = no key stored, otherwise stores the key index (0-15)
+	KeyPressedBuffer uint8
 
 	// --- LOGGING ---
 	Logger pkg.Logger
@@ -73,6 +76,7 @@ func (c *Chip8) Init() {
 	c.GFX = [ScreenWidth * ScreenHeight]uint8{0}
 	c.SP = 0
 	c.I = 512
+	c.KeyPressedBuffer = 255 // init buffer with "empty" value
 
 	// Load fonts into Ram
 	for i, v := range fontSet {
@@ -161,10 +165,6 @@ func (c *Chip8) Execute(opcode uint16) {
 	case AddVX:
 		c.OpAddToRegister(opcode)
 
-	// Sets I = NNN (Index Register)
-	case 0xA000:
-		c.OpSetIndexRegister(opcode)
-
 	// Math and Bitwise operators
 	case 0x8000:
 		switch opcode & 0xF00F {
@@ -188,6 +188,16 @@ func (c *Chip8) Execute(opcode uint16) {
 			c.OpLeftShift(opcode)
 		}
 
+	case SkipRegistersNotEqual:
+		c.OpSkipRegistersNotEqual(opcode)
+
+	// Sets I = NNN (Index Register)
+	case SetIndex:
+		c.OpSetIndexRegister(opcode)
+
+	case JumpPlusV0:
+		c.OpJumpPlusV0(opcode)
+
 	case Random:
 		c.OpRandom(opcode)
 	// DXYN
@@ -208,8 +218,14 @@ func (c *Chip8) Execute(opcode uint16) {
 		switch opcode & 0x00FF {
 		case GetDelayTimer:
 			c.OpGetDelayTimer(opcode)
+		case WaitKeypress:
+			c.OpWaitKeyPress(opcode)
 		case SetDelayTimer:
 			c.OpSetDelayTimer(opcode)
+		case SetSoundToVx:
+			c.OpSetSoundToVX(opcode)
+		case AddVXToIndex:
+			c.OpAddVXToIndex(opcode)
 		case SetIndexToSprite:
 			c.OpSetIndexToSprite(opcode)
 		case BinaryCodedDecimal:
