@@ -38,6 +38,8 @@ const (
 	StateStartup GameState = iota
 	StateMenu
 	StatePlaying
+	StateShutdown
+	StateExit
 )
 
 func (g *Game) Update() error {
@@ -48,7 +50,10 @@ func (g *Game) Update() error {
 		g.MenuCycle()
 	case StatePlaying:
 		g.PlayCycle()
-
+	case StateShutdown:
+		g.Shutdown()
+	case StateExit:
+		os.Exit(0)
 	}
 
 	return nil
@@ -75,6 +80,14 @@ func (g *Game) DoStartup() {
 }
 
 func (g *Game) MenuCycle() {
+	// Shutdown
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		g.Chip8.Init()
+		g.Chip8.LoadROM(Chip8PicturePath)
+		g.State = StateShutdown
+		g.FrameCounter = 0
+	}
+
 	// Navigation
 	if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) {
 		g.SelectedROM = (g.SelectedROM + 1) % len(g.AvailableROMs)
@@ -95,9 +108,23 @@ func (g *Game) MenuCycle() {
 	}
 }
 
+func (g *Game) Shutdown() {
+	g.FrameCounter++
+
+	if g.FrameCounter == 60 {
+		g.State = StateExit
+	}
+
+	g.PlayCycle()
+}
+
 func (g *Game) PlayCycle() {
 	// 1. Check for inputs
 	g.MapInput()
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		g.State = StateMenu
+	}
 
 	// 2. We cycle faster to speed up the cpu
 	for i := 0; i < 12; i++ {
@@ -124,6 +151,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case StateMenu:
 		g.DrawMenu(screen)
 	case StatePlaying:
+		g.DrawEmulator(screen)
+	case StateShutdown:
 		g.DrawEmulator(screen)
 	}
 }
