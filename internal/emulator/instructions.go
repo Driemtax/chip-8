@@ -132,7 +132,7 @@ func (c *Chip8) OpSkipVXEQVY(opcode uint16) {
 	if c.V[x] == c.V[y] {
 		// Remember that one instruction is 2 Bytes long!
 		c.PC += 2
-		message := fmt.Sprintf("IFXEQY %X, %Y\n", c.V[x], c.V[y])
+		message := fmt.Sprintf("IFXEQY %X, %X\n", c.V[x], c.V[y])
 		c.Log(message)
 	} else {
 		message := fmt.Sprintf("PASS since %X != %X\n", c.V[x], c.V[y])
@@ -302,7 +302,7 @@ func (c *Chip8) OpSkipRegistersNotEqual(opcode uint16) {
 
 	if VX != VY {
 		c.PC += 2
-		message := fmt.Sprintf("SNE V%X, V%Y\n", x, y)
+		message := fmt.Sprintf("SNE V%X, V%X\n", x, y)
 		c.Log(message)
 	}
 }

@@ -89,6 +89,7 @@ func (c *Chip8) Init() {
 
 // Loads a programm into ram. If the programm is too long, there will be an error.
 func (c *Chip8) LoadROM(name string) error {
+
 	if name == "" {
 		return errors.New("No name specified!")
 	}

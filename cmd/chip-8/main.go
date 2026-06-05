@@ -11,20 +11,91 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const (
-	screenWidth  = 64
-	screenHeight = 32
-	scale        = 10
+	screenWidth      = 64
+	screenHeight     = 32
+	scale            = 10
+	IbmLogoPath      = "IBM Logo.ch8"
+	Chip8PicturePath = "Chip8 Picture.ch8"
 )
 
 type Game struct {
-	Chip8 *emulator.Chip8
+	Chip8         *emulator.Chip8
+	State         GameState
+	FrameCounter  int
+	AvailableROMs []string
+	SelectedROM   int
 }
 
+type GameState int
+
+const (
+	StateStartup GameState = iota
+	StateMenu
+	StatePlaying
+)
+
 func (g *Game) Update() error {
+	switch g.State {
+	case StateStartup:
+		g.DoStartup()
+	case StateMenu:
+		g.MenuCycle()
+	case StatePlaying:
+		g.PlayCycle()
+
+	}
+
+	return nil
+}
+
+func (g *Game) DoStartup() {
+	// Show logo (12 Cycles per frame)
+	for i := 0; i < 12; i++ {
+		g.Chip8.Cycle()
+	}
+
+	g.reduceTimers()
+	g.FrameCounter++
+
+	if g.FrameCounter == 80 || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		g.Chip8.Init()
+		g.Chip8.LoadROM(Chip8PicturePath)
+		g.FrameCounter = 80
+	}
+
+	if g.FrameCounter > 240 || (g.FrameCounter >= 80 && inpututil.IsKeyJustPressed(ebiten.KeyEnter)) {
+		g.State = StateMenu
+	}
+}
+
+func (g *Game) MenuCycle() {
+	// Navigation
+	if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) {
+		g.SelectedROM = (g.SelectedROM + 1) % len(g.AvailableROMs)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) {
+		g.SelectedROM--
+		if g.SelectedROM < 0 {
+			g.SelectedROM = len(g.AvailableROMs) - 1
+		}
+	}
+
+	// Load Rom and start game
+	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		g.Chip8.Init()
+		path := g.AvailableROMs[g.SelectedROM]
+		g.Chip8.LoadROM(path)
+		g.State = StatePlaying
+	}
+}
+
+func (g *Game) PlayCycle() {
 	// 1. Check for inputs
 	g.MapInput()
 
@@ -33,6 +104,10 @@ func (g *Game) Update() error {
 		g.Chip8.Cycle()
 	}
 
+	g.reduceTimers()
+}
+
+func (g *Game) reduceTimers() {
 	// Reduce timers
 	if g.Chip8.DelayTimer > 0 {
 		g.Chip8.DelayTimer--
@@ -40,41 +115,65 @@ func (g *Game) Update() error {
 	if g.Chip8.SoundTimer > 0 {
 		g.Chip8.SoundTimer--
 	}
-
-	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	switch g.State {
+	case StateStartup:
+		g.DrawEmulator(screen)
+	case StateMenu:
+		g.DrawMenu(screen)
+	case StatePlaying:
+		g.DrawEmulator(screen)
+	}
+}
+
+func (g *Game) DrawMenu(screen *ebiten.Image) {
+	ebitenutil.DebugPrint(screen, "Waehle eine ROM: \n")
+
+	for i, rom := range g.AvailableROMs {
+		msg := rom
+		if i == g.SelectedROM {
+			msg = "> " + rom + " <"
+		}
+		ebitenutil.DebugPrintAt(screen, msg, 20, 20+i*15)
+	}
+}
+
+func (g *Game) DrawEmulator(screen *ebiten.Image) {
 	for i, pixel := range g.Chip8.GFX {
 		if pixel == 1 {
 			// calculate x and y from i
-			x := i % emulator.ScreenWidth
-			y := i / emulator.ScreenWidth
+			x := (i % emulator.ScreenWidth) * scale
+			y := (i / emulator.ScreenWidth) * scale
 
 			// Draw a white 1x1 pixel, this will be scaled up automatically
-			vector.FillRect(screen, float32(x), float32(y), 1, 1, color.White, false)
+			vector.FillRect(screen, float32(x), float32(y), scale, scale, color.White, false)
 		}
 	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
-	return screenWidth, screenHeight
+	return screenWidth * scale, screenHeight * scale
 }
 
 func main() {
 	fmt.Println("Starting up the CHIP-8...")
 	emu := &emulator.Chip8{}
 	emu.Init()
-	path := "Chip8 Picture.ch8"
-	err := emu.LoadROM(path)
-	if err != nil {
-		log.Fatal("Error loading ROM:", err)
-	}
 
 	ebiten.SetWindowSize(screenWidth*scale, screenHeight*scale)
 	ebiten.SetWindowTitle("CHIP-8 Emulator")
 
-	game := &Game{Chip8: emu}
+	romFIles := []string{"tetris.rom", "Clock Program.ch8", "Pong.ch8"}
+	game := &Game{
+		Chip8:         emu,
+		State:         StateStartup,
+		AvailableROMs: romFIles,
+	}
+
+	game.Chip8.LoadROM(IbmLogoPath)
+
 	// defer game.SaveLogs()
 	if err := ebiten.RunGame(game); err != nil {
 		log.Fatal(err)
