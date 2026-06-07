@@ -194,11 +194,12 @@ func main() {
 	ebiten.SetWindowSize(screenWidth*scale, screenHeight*scale)
 	ebiten.SetWindowTitle("CHIP-8 Emulator")
 
-	romFIles := []string{"tetris.rom", "Clock Program.ch8", "Pong.ch8"}
+	// TOOD: Read in all files from assets dir
+	romFiles := listRomFiles("assets")
 	game := &Game{
 		Chip8:         emu,
 		State:         StateStartup,
-		AvailableROMs: romFIles,
+		AvailableROMs: romFiles,
 	}
 
 	game.Chip8.LoadROM(IbmLogoPath)
@@ -297,4 +298,31 @@ func (g *Game) SaveLogs() {
 	} else {
 		fmt.Println("Saved logs to:", path)
 	}
+}
+
+func listRomFiles(dir string) []string {
+	var files []string
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatal("Could not read assets directory:", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+
+		if strings.HasSuffix(name, ".ch8") || strings.HasSuffix(name, ".rom") {
+			if name == IbmLogoPath || name == Chip8PicturePath {
+				continue
+			}
+
+			files = append(files, name)
+		}
+	}
+
+	return files
 }
