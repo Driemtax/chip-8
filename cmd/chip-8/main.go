@@ -17,11 +17,14 @@ import (
 )
 
 const (
-	screenWidth      = 64
-	screenHeight     = 32
-	scale            = 10
-	IbmLogoPath      = "IBM Logo.ch8"
-	Chip8PicturePath = "Chip8 Picture.ch8"
+	screenWidth             = 64
+	screenHeight            = 32
+	scale                   = 10
+	IbmLogoPath             = "IBM UltraFade.ch8"
+	Chip8PicturePath        = "Chip8 Picture.ch8"
+	Chip8ExitLogoPath       = "Chip8 emulator Logo.ch8"
+	startupStage1FrameCount = 100
+	startupStage2FrameCount = startupStage1FrameCount + 120
 )
 
 type Game struct {
@@ -68,22 +71,27 @@ func (g *Game) DoStartup() {
 	g.reduceTimers()
 	g.FrameCounter++
 
-	if g.FrameCounter == 80 || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+	if g.FrameCounter == startupStage1FrameCount || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 		g.Chip8.Init()
 		g.Chip8.LoadROM(Chip8PicturePath)
-		g.FrameCounter = 80
+		g.FrameCounter = startupStage1FrameCount
 	}
 
-	if g.FrameCounter > 240 || (g.FrameCounter >= 80 && inpututil.IsKeyJustPressed(ebiten.KeyEnter)) {
+	if g.FrameCounter > startupStage2FrameCount || (g.FrameCounter >= startupStage1FrameCount && inpututil.IsKeyJustPressed(ebiten.KeyEnter)) {
 		g.State = StateMenu
 	}
+
+	// if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+	// 	g.SaveLogs()
+	// 	g.State = StateExit
+	// }
 }
 
 func (g *Game) MenuCycle() {
 	// Shutdown
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		g.Chip8.Init()
-		g.Chip8.LoadROM(Chip8PicturePath)
+		g.Chip8.LoadROM(Chip8ExitLogoPath)
 		g.State = StateShutdown
 		g.FrameCounter = 0
 	}
@@ -218,7 +226,7 @@ func (g *Game) MapInput() {
 
 	// check for every possible key
 	// Key 1
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
+	if ebiten.IsKeyPressed(ebiten.Key1) {
 		g.Chip8.Key[0x1] = 1
 	}
 	// Key 2
@@ -230,12 +238,12 @@ func (g *Game) MapInput() {
 		g.Chip8.Key[0x3] = 1
 	}
 	// Key 4
-	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
+	if ebiten.IsKeyPressed(ebiten.Key4) {
 		g.Chip8.Key[0xC] = 1
 	}
 
 	// Key Q
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
 		g.Chip8.Key[0x4] = 1
 	}
 	// Key W
@@ -247,7 +255,7 @@ func (g *Game) MapInput() {
 		g.Chip8.Key[0x6] = 1
 	}
 	// KeyR
-	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
+	if ebiten.IsKeyPressed(ebiten.KeyR) {
 		g.Chip8.Key[0xD] = 1
 	}
 
@@ -269,7 +277,7 @@ func (g *Game) MapInput() {
 	}
 
 	// Key Y
-	if ebiten.IsKeyPressed(ebiten.KeyZ) {
+	if ebiten.IsKeyPressed(ebiten.KeyY) {
 		g.Chip8.Key[0xA] = 1
 	}
 	// Key X
@@ -316,7 +324,7 @@ func listRomFiles(dir string) []string {
 		name := entry.Name()
 
 		if strings.HasSuffix(name, ".ch8") || strings.HasSuffix(name, ".rom") {
-			if name == IbmLogoPath || name == Chip8PicturePath {
+			if name == IbmLogoPath || name == Chip8PicturePath || name == Chip8ExitLogoPath || name == "IBM Logo.ch8" {
 				continue
 			}
 
