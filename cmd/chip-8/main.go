@@ -1,16 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"chip-8/internal/emulator"
 	"fmt"
 	"image/color"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -33,6 +36,10 @@ type Game struct {
 	FrameCounter  int
 	AvailableROMs []string
 	SelectedROM   int
+
+	// Audio
+	audioContext *audio.Context
+	beepPlayer   *audio.Player
 }
 
 type GameState int
@@ -149,6 +156,16 @@ func (g *Game) reduceTimers() {
 	}
 	if g.Chip8.SoundTimer > 0 {
 		g.Chip8.SoundTimer--
+
+		// if sound timer is set play a beep
+		if !g.beepPlayer.IsPlaying() {
+			g.beepPlayer.Rewind()
+			g.beepPlayer.Play()
+		}
+	} else {
+		if g.beepPlayer.IsPlaying() {
+			g.beepPlayer.Pause()
+		}
 	}
 }
 
@@ -199,6 +216,10 @@ func main() {
 	emu := &emulator.Chip8{}
 	emu.Init()
 
+	// initialize audio
+	audioContext := audio.NewContext(44100)
+	beepPlayer := createBeepPlayer(audioContext)
+
 	ebiten.SetWindowSize(screenWidth*scale, screenHeight*scale)
 	ebiten.SetWindowTitle("CHIP-8 Emulator")
 
@@ -208,6 +229,8 @@ func main() {
 		Chip8:         emu,
 		State:         StateStartup,
 		AvailableROMs: romFiles,
+		audioContext:  audioContext,
+		beepPlayer:    beepPlayer,
 	}
 
 	game.Chip8.LoadROM(IbmLogoPath)
@@ -333,4 +356,40 @@ func listRomFiles(dir string) []string {
 	}
 
 	return files
+}
+
+func createBeepPlayer(context *audio.Context) *audio.Player {
+	const sampleRate = 44100
+	const freq = 440.0 // A4 = 440Hz
+	const duration = 1 // 1 second buffer
+
+	length := sampleRate * duration
+	buffer := make([]byte, length*4) // 4 bytes per sample (16-bit, 2 channels)
+
+	// generates a simple square wave signal
+	for i := 0; i < length; i++ {
+		sample := 0.0
+		if math.Sin(2*math.Pi*freq*float64(i)/sampleRate) > 0 {
+			sample = 0.3 // Amplitude 50%
+		} else {
+			sample = -0.3
+		}
+
+		// convert to int16
+		v := int16(sample * math.MaxInt16)
+
+		// left channel
+		buffer[4*i] = byte(v)
+		buffer[4*i+1] = byte(v >> 8)
+		// right channel
+		buffer[4*i+2] = byte(v)
+		buffer[4*i+3] = byte(v >> 8)
+	}
+
+	player, err := context.NewPlayer(bytes.NewReader(buffer))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return player
 }
