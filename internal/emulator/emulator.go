@@ -121,9 +121,9 @@ func (c *Chip8) Cycle() {
 	opcode := uint16(op1)
 	opcode = opcode << 8
 	opcode = opcode | uint16(op2)
-	if opcode != 0x1228 {
-		fmt.Println("Fetched:", ToHex(opcode))
-	}
+	// if opcode != 0x1228 {
+	// 	fmt.Println("Fetched:", ToHex(opcode))
+	// }
 
 	// --- DECODE & EXECUTE ---
 	c.Execute(opcode)
@@ -256,6 +256,6 @@ func ToHex(op uint16) string {
 }
 
 func (c *Chip8) Log(message string) {
-	fmt.Println(message)
+	//fmt.Println(message)
 	c.Logger = append(c.Logger, message)
 }

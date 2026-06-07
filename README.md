@@ -1,17 +1,23 @@
 # CHIP-8 Emulator in Go
-A [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) emulator written in Go, using the [Ebitengine](https://ebitengine.org/) for rendering and input handling.
 
-This project was created just for fun and to learn something new.
+A basic [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) emulator written in Go. Uses [Ebitengine](https://ebitengine.org/) for rendering and input handling.
+
+This project was created purely for fun and to learn more about emulators and low-level programming.
+
 ## Features
-- **Opcode Support:** Currently implements 28/35 opcodes of the CHIP-8 standard
-- **Graphics:** 64x32 monochrome display rendering.
-- **Input:** Keyboard mapping for the original 16-key hex keypad
-- **Timers:** Delay and Sound timers (60Hz)
-- **Logging:** Optional instruction logging for debugging.
+- **Opcode Support:** Full implementation of the standard CHIP-8 instruction set.
+- **Graphics & Splash:** Accurate 64x32 monochrome display rendering with custom boot-up animations.
+- **ROM Launcher:** Simple built-in menu to select and load `.ch8` or `.rom` files from your `assets/` folder.
+- **Timers:** Proper 60Hz Delay and Sound timers.
+- **Logging:** Optional instruction logging for debugging purposes.
 ## Getting started
-### Prerequisites
+### Pre-built Binarries
+You don't need to compile the project yourself. I provide pre-built binaries for **Windows** and **Linux (Ubuntu)** in the [Releases section](../../releases) on GitHub. Just download the executable, make sure there is an `assets` folder with ROMs next to it, and run it!
+### Compile from source
+**Requirements**:
 - Go 1.18 or higher
-### Installation
+
+**Installation**
 1. Clone the repository:
   ```bash
     git clone https://github.com/Driemtax/chip-8.git
@@ -21,27 +27,51 @@ This project was created just for fun and to learn something new.
 ```bash
 go mod tidy
 ```
-### Running a ROM
-Place your ROM file (e.g., Pong.ch8) in the assets folder.
+
+Place your ROM files (e.g., Pong.ch8) in the assets folder.
 
 Run the emulator:
 ```bash
 go run cmd/chip-8/main.go
 ```
 
-For now you have to set the path to the rom in main.go.
-
 ## Controls
 The original CHIP-8 used a 16-key-hexadecimal keypad. This emulator maps them to the following keyboard keys:
 
-|CHIP-8 Key | Keyboard Key | Function (Pong) |
-|------------|--------------|-----------------|
-| 1          | **W**        | Player 1 Up     |
-| 4          | **S**        | Player 1 Down   |
-| C          | **Arrow Up** | Player 2 Up     |
-| D          | **Arrow Down**| Player 2 Down  |
+1 2 3 4    maps to    1 2 3 C
+Q W E R    maps to    4 5 6 D
+A S D F    maps to    7 8 9 E
+Y X C V    maps to    A 0 B F 
 
-*(Other keys are mapped to 2, 3, Q, E, R, A, D, F, Z, X, C, V)*
+| CHIP-8 Key | Keyboard Key | 
+|------------|--------------|
+| 1          | **1**        |
+| 2          | **2**        |
+| 3          | **3**        | 
+| C          | **4**        |
+| 4          | **Q**        |
+| 5          | **W**        |
+| 6          | **E**        |
+| D          | **R**        |
+| 7          | **A**        |
+| 8          | **S**        |
+| 9          | **D**        |
+| E          | **F**        | 
+| A          | **Y**        |
+| 0          | **X**        |
+| B          | **C**        |
+| F          | **V**        |
+
+Every ROM has its controlls hardcoded and therefore cannot be configured by the emulator. For example Pong has the following controlls:
+
+| Instruction | CHIP-8 Key | Keyboard Key |
+|-------------|------------|--------------|
+| P1 UP       | **1**      | 1            |
+| P1 DOWN     | **4**      | Q            |
+| P2 UP       | **C**      | 4            |
+| P2 DOWN     | **D**      | R            |
+
+For the other games and roms you have to test and discover yourself, like in the old times.
 
 ## Technical Details
 For a deep dive into CHIP-8 architecture, visit [Wikipedia: CHIP-8](https://en.wikipedia.org/wiki/CHIP-8).
@@ -92,4 +122,4 @@ I $=$ 16-bit Index register
 | FX65 | LD Vx, [I] | Read registers V0 through Vx from memory starting at location I. |
 
 ## License 
-This project is open source and available under the [MIT License]().
+This project is open source and available under the [MIT License](https://opensource.org/license/mit).
