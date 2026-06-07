@@ -300,7 +300,7 @@ func (g *Game) MapInput() {
 	}
 
 	// Key Y
-	if ebiten.IsKeyPressed(ebiten.KeyY) {
+	if ebiten.IsKeyPressed(ebiten.KeyZ) {
 		g.Chip8.Key[0xA] = 1
 	}
 	// Key X
