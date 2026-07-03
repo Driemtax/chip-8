@@ -4,6 +4,8 @@ A basic [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) emulator written in Go. U
 
 This project was created purely for fun and to learn more about emulators and low-level programming.
 
+https://github.com/user-attachments/assets/1726c0d5-185c-4fbf-a31d-e10c3ff9f170
+
 ## Features
 - **Opcode Support:** Full implementation of the standard CHIP-8 instruction set.
 - **Graphics & Splash:** Accurate 64x32 monochrome display rendering with custom boot-up animations.
